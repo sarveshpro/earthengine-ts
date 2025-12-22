@@ -79,6 +79,8 @@ export interface ServiceAccountCredentials {
   email: string;
   /** The private key (private_key from JSON key). */
   privateKey: string;
+  /** The GCP project ID (project_id from JSON key). Optional. */
+  projectId?: string;
 }
 
 /**
@@ -88,8 +90,21 @@ export interface EarthEngineInitOptions {
   /**
    * Service account JSON key as a string or parsed object.
    * Use this for server-side authentication.
+   * Alternative to providing `email` and `privateKey` separately.
    */
   privateKeyJson?: string | ServiceAccountCredentials;
+
+  /**
+   * Service account email (client_email).
+   * Use together with `privateKey` as an alternative to `privateKeyJson`.
+   */
+  email?: string;
+
+  /**
+   * Service account private key.
+   * Use together with `email` as an alternative to `privateKeyJson`.
+   */
+  privateKey?: string;
 
   /**
    * Custom token retriever function for advanced authentication scenarios.

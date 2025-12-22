@@ -16,7 +16,7 @@ declare module '@google/earthengine' {
 
   interface EEData {
     authenticateViaPrivateKey(
-      credentials: { client_email: string; private_key: string },
+      credentials: { client_email: string; private_key: string; project_id?: string },
       success: () => void,
       error: (error: Error) => void
     ): void;
@@ -170,7 +170,7 @@ declare module '@google/earthengine' {
       success?: () => void,
       error?: (error: Error) => void,
       opt_xsrfToken?: string | null,
-      opt_project?: Record<string, unknown>
+      opt_project?: string | null
     ): void;
 
     reset(): void;

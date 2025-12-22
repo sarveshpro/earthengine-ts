@@ -32,6 +32,7 @@ const DEFAULT_SCOPES = ['https://www.googleapis.com/auth/earthengine'];
 
 /**
  * Parses a service account key from string or object format.
+ * Extracts email, privateKey, and projectId from the JSON.
  */
 function parseServiceAccountKey(
   keyInput: string | ServiceAccountCredentials
@@ -42,6 +43,7 @@ function parseServiceAccountKey(
       return {
         email: parsed.client_email as string,
         privateKey: parsed.private_key as string,
+        projectId: parsed.project_id as string | undefined,
       };
     } catch {
       throw new Error('Failed to parse service account JSON key');
@@ -61,9 +63,16 @@ function parseServiceAccountKey(
  *
  * @example
  * ```typescript
- * // Service account authentication
+ * // Service account authentication with JSON string
  * const client = await initEarthEngine({
  *   privateKeyJson: fs.readFileSync('./key.json', 'utf-8'),
+ *   project: 'my-project',
+ * });
+ *
+ * // Service account authentication with separate email and privateKey
+ * const client = await initEarthEngine({
+ *   email: 'service-account@project.iam.gserviceaccount.com',
+ *   privateKey: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n',
  *   project: 'my-project',
  * });
  *
@@ -77,18 +86,39 @@ function parseServiceAccountKey(
 export async function initEarthEngine(
   options: EarthEngineInitOptions = {}
 ): Promise<typeof ee> {
-  const { privateKeyJson, tokenRetriever, project, baseUrl } = options;
+  const { privateKeyJson, email, privateKey, tokenRetriever, project, baseUrl } = options;
 
   // Authenticate based on provided credentials
-  if (privateKeyJson) {
-    const credentials = parseServiceAccountKey(privateKeyJson);
-
+  // Priority: 1. separate email/privateKey, 2. privateKeyJson, 3. tokenRetriever
+  if (email && privateKey) {
+    const credentials: { client_email: string; private_key: string; project_id?: string } = {
+      client_email: email,
+      private_key: privateKey,
+    };
+    if (project && typeof project === 'string') {
+      credentials.project_id = project.trim();
+    }
     await new Promise<void>((resolve, reject) => {
       ee.data.authenticateViaPrivateKey(
-        {
-          client_email: credentials.email,
-          private_key: credentials.privateKey,
-        },
+        credentials,
+        () => resolve(),
+        (error: Error) => reject(error)
+      );
+    });
+  } else if (privateKeyJson) {
+    const parsedCredentials = parseServiceAccountKey(privateKeyJson);
+    const credentials: { client_email: string; private_key: string; project_id?: string } = {
+      client_email: parsedCredentials.email,
+      private_key: parsedCredentials.privateKey,
+    };
+    if (project && typeof project === 'string') {
+      credentials.project_id = project.trim();
+    } else if (parsedCredentials.projectId) {
+      credentials.project_id = parsedCredentials.projectId;
+    }
+    await new Promise<void>((resolve, reject) => {
+      ee.data.authenticateViaPrivateKey(
+        credentials,
         () => resolve(),
         (error: Error) => reject(error)
       );
@@ -97,26 +127,26 @@ export async function initEarthEngine(
     const token = await tokenRetriever();
     ee.data.setAuthToken('', 'Bearer', token, 3600, [], undefined, false);
   }
-  // If neither is provided, assume authentication is handled externally
-  // (e.g., via application default credentials or prior initialization)
 
   // Initialize the Earth Engine API
   await new Promise<void>((resolve, reject) => {
-    const initOptions: Record<string, unknown> = {};
+    let projectValue: string | null = null;
     if (project) {
-      initOptions.project = project;
-    }
-    if (baseUrl) {
-      initOptions.baseUrl = baseUrl;
+      if (typeof project !== 'string') {
+        return reject(new Error(`Project must be a string, got ${typeof project}`));
+      }
+      projectValue = project.trim() || null;
     }
 
+    const baseUrlValue = baseUrl ? String(baseUrl).trim() : null;
+
     ee.initialize(
-      null,
+      baseUrlValue,
       null,
       () => resolve(),
       (error: Error) => reject(error),
       null,
-      Object.keys(initOptions).length > 0 ? initOptions : undefined
+      projectValue
     );
   });
 
@@ -157,10 +187,7 @@ export async function initWithOAuth(options: OAuthOptions): Promise<typeof ee> {
 
   // Initialize the Earth Engine API
   await new Promise<void>((resolve, reject) => {
-    const initOptions: Record<string, unknown> = {};
-    if (project) {
-      initOptions.project = project;
-    }
+    const projectValue = project && typeof project === 'string' ? project.trim() : null;
 
     ee.initialize(
       null,
@@ -168,7 +195,7 @@ export async function initWithOAuth(options: OAuthOptions): Promise<typeof ee> {
       () => resolve(),
       (error: Error) => reject(error),
       null,
-      Object.keys(initOptions).length > 0 ? initOptions : undefined
+      projectValue
     );
   });
 

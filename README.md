@@ -97,6 +97,13 @@ await initEarthEngine({
   },
   project: 'my-gcp-project',
 });
+
+// Or pass email and privateKey separately
+await initEarthEngine({
+  email: 'my-service-account@my-project.iam.gserviceaccount.com',
+  privateKey: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n',
+  project: 'my-gcp-project',
+});
 ```
 
 ### Custom Token Retriever

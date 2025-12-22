@@ -95,6 +95,70 @@ describe('initEarthEngine', () => {
     );
   });
 
+  it('should initialize with separate email and privateKey', async () => {
+    vi.mocked(ee.data.authenticateViaPrivateKey).mockImplementation(
+      (_credentials, success, _error) => {
+        success();
+      }
+    );
+    vi.mocked(ee.initialize).mockImplementation(
+      (_a, _b, success, _error, _c, _d) => {
+        success();
+      }
+    );
+
+    const result = await initEarthEngine({
+      email: 'test@example.iam.gserviceaccount.com',
+      privateKey: '-----BEGIN PRIVATE KEY-----\nMOCK\n-----END PRIVATE KEY-----',
+      project: 'test-project',
+    });
+
+    expect(result).toBe(ee);
+    expect(ee.data.authenticateViaPrivateKey).toHaveBeenCalledWith(
+      {
+        client_email: 'test@example.iam.gserviceaccount.com',
+        private_key: '-----BEGIN PRIVATE KEY-----\nMOCK\n-----END PRIVATE KEY-----',
+        project_id: 'test-project',
+      },
+      expect.any(Function),
+      expect.any(Function)
+    );
+  });
+
+  it('should prioritize separate email/privateKey over privateKeyJson', async () => {
+    vi.mocked(ee.data.authenticateViaPrivateKey).mockImplementation(
+      (_credentials, success, _error) => {
+        success();
+      }
+    );
+    vi.mocked(ee.initialize).mockImplementation(
+      (_a, _b, success, _error, _c, _d) => {
+        success();
+      }
+    );
+
+    await initEarthEngine({
+      email: 'separate@example.iam.gserviceaccount.com',
+      privateKey: '-----BEGIN PRIVATE KEY-----\nSEPARATE\n-----END PRIVATE KEY-----',
+      privateKeyJson: JSON.stringify({
+        client_email: 'json@example.iam.gserviceaccount.com',
+        private_key: '-----BEGIN PRIVATE KEY-----\nJSON\n-----END PRIVATE KEY-----',
+      }),
+      project: 'test-project',
+    });
+
+    // Should use the separate email/privateKey, not the JSON
+    expect(ee.data.authenticateViaPrivateKey).toHaveBeenCalledWith(
+      {
+        client_email: 'separate@example.iam.gserviceaccount.com',
+        private_key: '-----BEGIN PRIVATE KEY-----\nSEPARATE\n-----END PRIVATE KEY-----',
+        project_id: 'test-project',
+      },
+      expect.any(Function),
+      expect.any(Function)
+    );
+  });
+
   it('should initialize with custom token retriever', async () => {
     const mockToken = 'mock-access-token';
     const tokenRetriever = vi.fn().mockResolvedValue(mockToken);
